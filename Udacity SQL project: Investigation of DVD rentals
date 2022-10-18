@@ -1,0 +1,107 @@
+# 1. Question: Top 20 Family Movies by rental amount // Amount of Rentals by family-friendly categories
+ SELECT
+    f.title,
+    c.name,
+    COUNT(rental_id) AS rental_count
+FROM
+    film_category fc
+    JOIN category c ON c.category_id = fc.category_id
+    JOIN film f ON f.film_id = fc.film_id
+    JOIN inventory i ON i.film_id = f.film_id
+    JOIN rental r ON r.inventory_id = i.inventory_id
+WHERE
+    c.name IN ('Animation', 'Children', 'Classics', 'Comedy', 'Family', 'Music')
+GROUP BY
+    1,
+    2
+ORDER BY
+    rental_count DESC
+LIMIT 20;
+
+# Question 2: table of movie titles divided into 4 levels based on the quartiles of the rental duration for movies across all categories
+WITH ntiles_table AS (
+    SELECT
+        f.title,
+        c.name,
+        f.rental_duration,
+        NTILE(4)
+        OVER (
+        ORDER BY
+            f.rental_duration) AS standard_quartile
+    FROM
+        film_category fc
+        JOIN category c ON c.category_id = fc.category_id
+        JOIN film f ON f.film_id = fc.film_id
+    WHERE
+        c.name IN ('Animation', 'Children', 'Classics', 'Comedy', 'Family', 'Music'))
+SELECT
+    name, standard_quartile, COUNT(rental_duration) AS count
+FROM
+    ntiles_table
+GROUP BY
+    1,
+    2
+ORDER BY
+    1,
+    2;
+
+# Question 3: Rental store comparison based on count of rental orders during every month for all the years we have data for
+SELECT
+    DATE_PART('month', r.rental_date) AS rental_month,
+    DATE_PART('year', r.rental_date) AS rental_year,
+    s1.store_id AS store,
+    COUNT(*)
+FROM
+    store s1
+    JOIN staff s2 ON s1.store_id = s2.staff_id
+    JOIN rental r ON s2.staff_id = r.staff_id
+GROUP BY
+    1,
+    2,
+    3
+ORDER BY
+    4 DESC;
+
+# Question 4: Top 10 paying customers based on how many payments they made on a monthly basis during 2207
+WITH cust_info AS (
+    SELECT
+        c.first_name || ' ' || c.last_name AS fullname,
+        p.amount,
+        p.payment_date
+    FROM
+        customer c
+        JOIN payment p ON p.customer_id = c.customer_id),
+top10 AS (
+    SELECT
+        fullname,
+        SUM(amount)
+    FROM
+        cust_info
+    GROUP BY
+        1
+    ORDER BY
+        2 DESC
+    LIMIT 10),
+monthly AS (
+    SELECT
+        DATE_TRUNC('month', payment_date) AS pay_month,
+        c.fullname,
+        COUNT(*) AS pay_countpermon,
+        SUM(amount) AS pay_amount
+    FROM
+        cust_info c
+        JOIN top10 t ON c.fullname = t.fullname
+    WHERE
+        payment_date BETWEEN '01-01-2007'
+        AND '01-01-2008'
+    GROUP BY
+        1,
+        2
+)
+SELECT
+    *
+FROM
+    monthly
+ORDER BY
+    2,
+    1;
